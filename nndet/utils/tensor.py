@@ -9,7 +9,7 @@ import numpy as np
 from torch import Tensor
 
 from collections import abc
-from torch._six import string_classes
+string_classes = str  # torch._six removed in PyTorch 2.x
 from typing import Sequence, Union, Any, Mapping, Callable, List
 
 np_str_obj_array_pattern = re.compile(r'[SaUO]')

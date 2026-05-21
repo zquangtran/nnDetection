@@ -12,41 +12,43 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 
-# Contains pytorch, torchvision, cuda, cudnn
-FROM nvcr.io/nvidia/pytorch:21.11-py3
+FROM nvcr.io/nvidia/pytorch:25.04-py3
 
 ARG env_det_num_threads=6
 ARG env_det_verbose=1
 
-# Setup environment variables
-ENV det_data=/opt/data det_models=/opt/models det_num_threads=$env_det_num_threads det_verbose=$env_det_verbose OMP_NUM_THREADS=1
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    OMP_NUM_THREADS=1 \
+    det_num_threads=${env_det_num_threads} \
+    det_verbose=${env_det_verbose} \
+    det_data=/opt/data \
+    det_models=/opt/models \
+    CUDA_HOME=/usr/local/cuda \
+    PATH=/usr/local/cuda/bin:$PATH \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH \
+    FORCE_CUDA=1
 
-# Install some tools
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && apt-get install -y \
- git \
- cmake \
- make \
- wget \
- gnupg \
- build-essential \
- software-properties-common \
- gdb \
- ninja-build
+RUN apt-get update && apt-get install -y \
+    python3-dev \
+    build-essential \
+    cmake \
+    g++ \
+    gcc \
+    ninja-build \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# updating requests and urllib3 fixed compatibility with my docker version
-RUN pip install numpy \
-  && pip install --upgrade requests \
-  && pip install --upgrade urllib3
-
-# Install own code
-COPY ./requirements.txt .
-RUN mkdir ${det_data} \
-  && mkdir ${det_models} \
-  && mkdir -p /opt/code/nndet \
-  && pip install -r requirements.txt  \
-  && pip install hydra-core --upgrade --pre \
-  && pip install git+https://github.com/mibaumgartner/pytorch_model_summary.git
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel scikit-build
 
 WORKDIR /opt/code/nndet
 COPY . .
-RUN FORCE_CUDA=1 pip install -v -e .
+
+RUN mkdir -p ${det_data} ${det_models}
+
+RUN pip install --no-cache-dir -r requirements.txt \
+  && pip install --no-cache-dir hydra-core --upgrade --pre \
+  && pip install --no-cache-dir git+https://github.com/mibaumgartner/pytorch_model_summary.git
+
+# --no-build-isolation ensures torch is on sys.path during setup.py / CUDA ext build
+RUN pip install --no-cache-dir --no-build-isolation -v -e .
